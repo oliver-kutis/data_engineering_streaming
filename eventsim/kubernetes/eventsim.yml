@@ -1,0 +1,97 @@
+---
+kind: ConfigMap
+metadata:
+  name: eventsim
+  namespace: test-kafka
+apiVersion: v1
+data:
+  topic_list.txt: |
+    auth_events
+    listen_events
+    page_view_events
+    status_change_events
+
+  create_topic.sh: |-
+    exec 2>&1
+
+    cat "/test/topic_list.txt" | xargs -L1 sh -e /opt/kafka/bin/kafka-topics.sh --bootstrap-server bootstrap.$POD_NAMESPACE:9092 --create --if-not-exists --replication-factor 3 --partitions 5 --topic 
+
+    exit 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: eventsim
+  namespace: test-kafka
+spec:
+  parallelism: 2
+  template:
+    spec:
+      initContainers:
+      - name: topic-create
+        image: kafka:2.6.0
+        command:
+        - /bin/bash
+        - -e
+        - /test/create_topic.sh
+        resources:
+          limits:
+            cpu: 100m
+            memory: 1024Mi
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        volumeMounts:
+        - name: config
+          mountPath: /test
+        - name: shared
+          mountPath: /shared
+      containers:
+      - name: list-topics
+        image: kafka:2.6.0
+        command:
+        - ./bin/kafka-topics.sh
+        - --bootstrap-server
+        -   bootstrap.$(POD_NAMESPACE):9092
+        - --list
+        resources:
+          limits:
+            cpu: 100m
+            memory: 1024Mi
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+      - name: data-generator
+        image: eventsim
+        command:
+        - ./eventsim.sh
+        - -c
+        -  examples/example-config.json
+        - --from
+        -   "365"
+        - --nusers
+        -   "1000"
+        - --growth-rate
+        -   "0.01"
+        - -k
+        -  bootstrap.$(POD_NAMESPACE):9092
+        resources:
+          limits:
+            cpu: 100m
+            memory: 1024Mi
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+      restartPolicy: Never
+      volumes:
+      - name: config
+        configMap:
+          name: eventsim
+      - name: shared
+        emptyDir: {}

@@ -1,0 +1,28 @@
+<holidays>
+    <config>
+        <description>United States Holidays</description>
+        <hierarchy>
+            <hierarchyElement id="us" type="country"/>
+        </hierarchy>
+    </config>
+    <substitutes>
+        <substitute>
+            <date>
+                <fixed month="1" day="1"/>
+            </date>
+            <description>New Year's Day</description>
+        </substitute>
+        <substitute>
+            <date>
+                <fixed month="7" day="4"/>
+            </date>
+            <description>Independence Day</description>
+        </substitute>
+        <substitute>
+            <date>
+                <fixed month="12" day="25"/>
+            </date>
+            <description>Christmas Day</description>
+        </substitute>
+    </substitutes>
+</holidays>
