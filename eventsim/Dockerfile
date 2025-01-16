@@ -41,6 +41,7 @@ COPY src ./src
 COPY assembly.sbt ./assembly.sbt
 COPY build.sbt ./build.sbt
 COPY eventsim.sh ./eventsim.sh
+COPY entrypoint.sh ./entrypoint.sh
 
 # Run sbt assembly
 RUN sbt assembly
@@ -53,7 +54,11 @@ RUN sbt assembly
 RUN chmod +x bin/eventsim
 RUN sed -i 's/\r$//' bin/eventsim
 
-CMD ["/bin/bash"]
+# # CMD ["/bin/bash"]
+RUN chmod +x entrypoint.sh
+
+# # Define the entrypoint to run the application
+ENTRYPOINT ["sh", "entrypoint.sh"]
 
 # # Define the entrypoint to run the application
 # ENTRYPOINT ["sh", "/opt/eventsim/eventsim.sh"]

@@ -32,12 +32,29 @@ services:
       CONFLUENT_METRICS_ENABLE: "true"
       CONFLUENT_SUPPORT_CUSTOMER_ID: "anonymous"
 
+  # kafka-tools:
+  #   image: confluentinc/cp-kafka:7.8.0
+  #   hostname: kafka-tools
+  #   container_name: kafka-tools
+  #   depends_on:
+  #     - broker
+  # entrypoint: [
+  #     "/bin/sh",
+  #     "-c",
+  #     " \
+  #     kafka-topics --create --topic auth_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
+  #     kafka-topics --create --topic listen_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
+  #     kafka-topics --create --topic page_view_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
+  #     kafka-topics --create --topic status_change_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
+  #     tail -f /dev/null \
+  #     ",
+  #   ]
   kafka-tools:
     image: confluentinc/cp-kafka:7.8.0
     hostname: kafka-tools
     container_name: kafka-tools
     command: ["tail", "-f", "/dev/null"]
-    network_mode: "host"
+    # network_mode: "host"
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.8.0
@@ -50,6 +67,7 @@ services:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "broker:29092"
       SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
 
   control-center:
@@ -71,3 +89,41 @@ services:
       CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
       CONFLUENT_METRICS_TOPIC_REPLICATION: 1
       PORT: 9021
+
+  eventsim:
+    build:
+      context: eventsim/.
+      dockerfile: Dockerfile
+    depends_on:
+      - broker
+    hostname: eventsim
+    container_name: eventsim
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 6G
+  # command: >
+  #   ./bin/eventsim -c examples/example-config.json \
+  #   --start-time "$(date +%Y-%m-%dT%H:%M:%S)" \
+  #   --end-time "$(date -v '+1d' +%Y-%m-%dT%H:%M %S)" \
+  #   --nusers 200000 \
+  #   --growth-rate 10 \
+  #   --randomseed 123 \
+  #   --kafkaBrokerList localhost:9092 \
+  #   --continuous
+
+  # create-topics:
+  #   image: confluentinc/cp-kafka:7.8.0
+  #   depends_on:
+  #     - broker
+  #   entrypoint: [
+  #       "bin/sh",
+  #       "-c",
+  #       " \
+  #       kafka-topics --create --topic auth_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
+  #       kafka-topics --create --topic listen_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
+  #       kafka-topics --create --topic page_view_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
+  #       kafka-topics --create --topic status_change_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 \
+  #       ",
+  #     ]
