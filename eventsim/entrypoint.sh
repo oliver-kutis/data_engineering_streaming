@@ -8,8 +8,14 @@ END_TIME=$(date -d '+1 day' +%Y-%m-%dT%H:%M:%S)
 ./bin/eventsim -c examples/example-config.json \
   --start-time "$START_TIME" \
   --end-time "$END_TIME" \
-  --nusers 2000000 \
+  --nusers 100000 \
   --growth-rate 10 \
   --randomseed 123 \
-  --kafkaBrokerList localhost:9092 \
+  --kafkaBrokerList broker:29092 \
   --continuous
+
+# Log the completion of the eventsim command
+echo "eventsim command completed."
+
+# Keep the container running for debugging purposes
+tail -f /dev/null

@@ -1,0 +1,26 @@
+{
+  "type": "record",
+  "name": "ListenEvent",
+  "namespace": "com.example.analytics",
+  "fields": [
+    { "name": "artist", "type": "string" },
+    { "name": "song", "type": "string" },
+    { "name": "duration", "type": "double" },
+    { "name": "ts", "type": "long" },
+    { "name": "sessionId", "type": "int" },
+    { "name": "auth", "type": "string" },
+    { "name": "level", "type": "string" },
+    { "name": "itemInSession", "type": "int" },
+    { "name": "city", "type": "string" },
+    { "name": "zip", "type": "string" },
+    { "name": "state", "type": "string" },
+    { "name": "userAgent", "type": "string" },
+    { "name": "lon", "type": "double" },
+    { "name": "lat", "type": "double" },
+    { "name": "userId", "type": "int" },
+    { "name": "lastName", "type": "string" },
+    { "name": "firstName", "type": "string" },
+    { "name": "gender", "type": "string" },
+    { "name": "registration", "type": "long" }
+  ]
+}
