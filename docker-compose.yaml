@@ -114,6 +114,67 @@ services:
           cpus: 1
           memory: 6G
     oom_kill_disable: true
+
+  # redis:
+  #   image: redis:6.2
+  #   container_name: redis
+  #   hostname: redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+
+  
+
+  # spark-master:
+  #   image: bitnami/spark:3
+  #   container_name: spark-master
+  #   # hostname: spark-master
+  #   ports:
+  #     - "8080:8080"
+  #     - "7077:7077"
+  #   environment:
+  #     SPARK_MODE: "master"
+  #     SPARK_MASTER_HOST: "spark-master"
+  #     SPARK_MASTER_PORT_NUMBER: "7077"
+  #     SPARK_MASTER_WEBUI_PORT_NUMBER: "8080"
+  #     SPARK_MASTER_LOG_LEVEL: "INFO"
+  #     SPARK_MASTER_OPTS: "-Dspark.deploy.defaultCores=1 -Dspark.deploy.defaultMemory=1g"
+  #     SPARK_WORKER_MEMORY: "1g"
+  #     SPARK_WORKER_CORES: "1"
+  #     SPARK_WORKER_INSTANCES: "1"
+  #     SPARK_WORKER_PORT: "7078"
+  #     SPARK_WORKER_WEBUI_PORT: "8082"
+  #     SPARK_WORKER_LOG_LEVEL: "INFO"
+  #     SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
+  #   volumes:
+  #     - ./spark/data:/opt/bitnami/spark/data
+  #     - ./spark/apps:/opt/bitnami/spark/apps
+  #     - spark-events:/opt/bitnami/spark/events
+
+  # spark-worker:
+  #   image: bitnami/spark:3
+  #   container_name: spark-worker
+  #   # hostname: spark-worker
+  #   ports:
+  #     - "8082:8082"
+  #   environment:
+  #     SPARK_MODE: "worker"
+  #     SPARK_MASTER_URL: "spark://spark-master:7077"
+  #     SPARK_WORKER_MEMORY: "1g"
+  #     SPARK_WORKER_CORES: "1"
+  #     SPARK_WORKER_PORT: "7078"
+  #     SPARK_WORKER_WEBUI_PORT: "8082"
+  #     SPARK_WORKER_LOG_LEVEL: "INFO"
+  #     SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
+  #   volumes:
+  #     - ./spark/data:/opt/bitnami/spark/data
+  #     - ./spark/apps:/opt/bitnami/spark/apps
+  #     - spark-events:/opt/bitnami/spark/events
+
+volumes:
+  redis-data:
+  # spark-events:
   # command: >
   #   ./bin/eventsim -c examples/example-config.json \
   #   --start-time "$(date +%Y-%m-%dT%H:%M:%S)" \
