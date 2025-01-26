@@ -32,23 +32,6 @@ services:
       CONFLUENT_METRICS_ENABLE: "true"
       CONFLUENT_SUPPORT_CUSTOMER_ID: "anonymous"
 
-  # kafka-tools:
-  #   image: confluentinc/cp-kafka:7.8.0
-  #   hostname: kafka-tools
-  #   container_name: kafka-tools
-  #   depends_on:
-  #     - broker
-  # entrypoint: [
-  #     "/bin/sh",
-  #     "-c",
-  #     " \
-  #     kafka-topics --create --topic auth_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
-  #     kafka-topics --create --topic listen_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
-  #     kafka-topics --create --topic page_view_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
-  #     kafka-topics --create --topic status_change_events --bootstrap-server broker:9092 --partitions 1 --replication-factor 1 && \
-  #     tail -f /dev/null \
-  #     ",
-  #   ]
   kafka-tools:
     image: confluentinc/cp-kafka:7.8.0
     hostname: kafka-tools
@@ -115,87 +98,111 @@ services:
           memory: 6G
     oom_kill_disable: true
 
-  # redis:
-  #   image: redis:6.2
-  #   container_name: redis
-  #   hostname: redis
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis-data:/data
+  cassandra:
+    image: cassandra:5.0
+    hostname: cassandra
+    container_name: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_USER: admin
+      CASSANDRA_PASSWORD: admin
+      CASSANDRA_CLUSTER_NAME: "Spark metrics"
+      CASSANDRA_NUM_TOKENS: 256
+      CASSANDRA_DC: "datacenter1"
+      CASSANDRA_RACK: "rack1"
+      CASSANDRA_ENDPOINT_SNITCH: "GossipingPropertyFileSnitch"
 
-  
+  spark-master:
+    image: bitnami/spark:3.5.1
+    container_name: spark-master
+    # hostname: spark-master
+    depends_on:
+      - broker
+      - eventsim
+      - cassandra
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      SPARK_MODE: "master"
+      SPARK_MASTER_HOST: "spark-master"
+      SPARK_MASTER_PORT_NUMBER: "7077"
+      SPARK_MASTER_WEBUI_PORT_NUMBER: "8080"
+      SPARK_MASTER_LOG_LEVEL: "INFO"
+      SPARK_MASTER_OPTS: "-Dspark.deploy.defaultCores=1 -Dspark.deploy.defaultMemory=1g"
+      SPARK_WORKER_MEMORY: "1g"
+      SPARK_WORKER_CORES: "1"
+      SPARK_WORKER_INSTANCES: "1"
+      SPARK_WORKER_PORT: "7078"
+      SPARK_WORKER_WEBUI_PORT: "8082"
+      SPARK_WORKER_LOG_LEVEL: "INFO"
+      SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
+    extra_hosts:
+      - "host.docker.internal:${HOST_IP}"
+    volumes:
+      - ./spark/main.py:/opt/bitnami/spark/python_scripts/main.py
+      - ./spark/data:/opt/bitnami/spark/data
+      - ./spark/apps:/opt/bitnami/spark/apps
+      - ./spark/events:/opt/bitnami/spark/events
+      - ./spark/conf:/opt/bitnami/spark/conf
 
-  # spark-master:
-  #   image: bitnami/spark:3
-  #   container_name: spark-master
-  #   # hostname: spark-master
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    container_name: spark-worker
+    # hostname: spark-worker
+    ports:
+      - "8082:8082"
+    depends_on:
+      - broker
+      - eventsim
+      - cassandra
+    environment:
+      SPARK_MODE: "worker"
+      SPARK_MASTER_URL: "spark://spark-master:7077"
+      SPARK_WORKER_MEMORY: "2g"
+      SPARK_WORKER_CORES: "2"
+      SPARK_WORKER_PORT: "7078"
+      SPARK_WORKER_WEBUI_PORT: "8082"
+      SPARK_WORKER_LOG_LEVEL: "INFO"
+      SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
+    extra_hosts:
+      - "host.docker.internal:${HOST_IP}"
+    volumes:
+      - ./spark/main.py:/opt/bitnami/spark/python_scripts/main.py
+      - ./spark/data:/opt/bitnami/spark/data
+      - ./spark/apps:/opt/bitnami/spark/apps
+      - ./spark/events:/opt/bitnami/spark/events
+      - ./spark/conf:/opt/bitnami/spark/conf
+  # spark-jupyter:
+  #   image: jupyter/pyspark-notebook:lab-3.5.1
+  #   container_name: spark-jupyter
   #   ports:
-  #     - "8080:8080"
-  #     - "7077:7077"
-  #   environment:
-  #     SPARK_MODE: "master"
-  #     SPARK_MASTER_HOST: "spark-master"
-  #     SPARK_MASTER_PORT_NUMBER: "7077"
-  #     SPARK_MASTER_WEBUI_PORT_NUMBER: "8080"
-  #     SPARK_MASTER_LOG_LEVEL: "INFO"
-  #     SPARK_MASTER_OPTS: "-Dspark.deploy.defaultCores=1 -Dspark.deploy.defaultMemory=1g"
-  #     SPARK_WORKER_MEMORY: "1g"
-  #     SPARK_WORKER_CORES: "1"
-  #     SPARK_WORKER_INSTANCES: "1"
-  #     SPARK_WORKER_PORT: "7078"
-  #     SPARK_WORKER_WEBUI_PORT: "8082"
-  #     SPARK_WORKER_LOG_LEVEL: "INFO"
-  #     SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
-  #   volumes:
-  #     - ./spark/data:/opt/bitnami/spark/data
-  #     - ./spark/apps:/opt/bitnami/spark/apps
-  #     - spark-events:/opt/bitnami/spark/events
-
-  # spark-worker:
-  #   image: bitnami/spark:3
-  #   container_name: spark-worker
-  #   # hostname: spark-worker
-  #   ports:
-  #     - "8082:8082"
-  #   environment:
-  #     SPARK_MODE: "worker"
-  #     SPARK_MASTER_URL: "spark://spark-master:7077"
-  #     SPARK_WORKER_MEMORY: "1g"
-  #     SPARK_WORKER_CORES: "1"
-  #     SPARK_WORKER_PORT: "7078"
-  #     SPARK_WORKER_WEBUI_PORT: "8082"
-  #     SPARK_WORKER_LOG_LEVEL: "INFO"
-  #     SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
-  #   volumes:
-  #     - ./spark/data:/opt/bitnami/spark/data
-  #     - ./spark/apps:/opt/bitnami/spark/apps
-  #     - spark-events:/opt/bitnami/spark/events
+  #     - "10000:8889"
 
 volumes:
-  redis-data:
-  # spark-events:
-  # command: >
-  #   ./bin/eventsim -c examples/example-config.json \
-  #   --start-time "$(date +%Y-%m-%dT%H:%M:%S)" \
-  #   --end-time "$(date -v '+1d' +%Y-%m-%dT%H:%M %S)" \
-  #   --nusers 200000 \
-  #   --growth-rate 10 \
-  #   --randomseed 123 \
-  #   --kafkaBrokerList localhost:9092 \
-  #   --continuous
+  spark-events:
+# command: >
+#   ./bin/eventsim -c examples/example-config.json \
+#   --start-time "$(date +%Y-%m-%dT%H:%M:%S)" \
+#   --end-time "$(date -v '+1d' +%Y-%m-%dT%H:%M %S)" \
+#   --nusers 200000 \
+#   --growth-rate 10 \
+#   --randomseed 123 \
+#   --kafkaBrokerList localhost:9092 \
+#   --continuous
 
-  # create-topics:
-  #   image: confluentinc/cp-kafka:7.8.0
-  #   depends_on:
-  #     - broker
-  #   entrypoint: [
-  #       "bin/sh",
-  #       "-c",
-  #       " \
-  #       kafka-topics --create --topic auth_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 && \
-  #       kafka-topics --create --topic listen_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 && \
-  #       kafka-topics --create --topic page_view_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 && \
-  #       kafka-topics --create --topic status_change_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 \
-  #       ",
-  #     ]
+# create-topics:
+#   image: confluentinc/cp-kafka:7.8.0
+#   depends_on:
+#     - broker
+#   entrypoint: [
+#       "bin/sh",
+#       "-c",
+#       " \
+#       kafka-topics --create --topic auth_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 && \
+#       kafka-topics --create --topic listen_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 && \
+#       kafka-topics --create --topic page_view_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 && \
+#       kafka-topics --create --topic status_change_events --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 \
+#       ",
+#     ]
