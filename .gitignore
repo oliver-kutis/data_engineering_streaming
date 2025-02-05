@@ -1,1 +1,24 @@
-.venv
+# Local enviroment
+.venv/
+.conda/
+.vscode/
+get-pip.py
+requirements.txt
+
+# Terraform
+terraform/*terraform*
+
+# Secrets
+.keys/
+.env
+
+# Spark
+spark/conf/*
+!spark/conf/spark-defaults.conf
+
+spark/events
+spark/data
+spark/apps
+
+# Cassandra
+cassandra/
