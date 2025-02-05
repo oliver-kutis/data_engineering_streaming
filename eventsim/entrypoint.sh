@@ -8,7 +8,7 @@ END_TIME=$(date -d '+1 day' +%Y-%m-%dT%H:%M:%S)
 ./bin/eventsim -c examples/example-config.json \
   --start-time "$START_TIME" \
   --end-time "$END_TIME" \
-  --nusers 100000 \
+  --nusers 10000 \
   --growth-rate 10 \
   --randomseed 123 \
   --kafkaBrokerList broker:29092 \
