@@ -4,6 +4,7 @@
 .vscode/
 get-pip.py
 requirements.txt
+__pycache__/
 
 # Terraform
 terraform/*terraform*
