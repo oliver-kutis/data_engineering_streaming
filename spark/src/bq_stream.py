@@ -20,6 +20,9 @@ if __name__ == "__main__":
         # .master("http://172.19.0.3:7078")
         .master("spark://spark-master:7077")
         .appName("test_bq_stream")
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.3.0 ")
+        .config("spark.jars", "https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.20/gcs-connector-hadoop3-2.2.20.jar")
+        # .config("spark.jars.packages", "org.apache.spark:spark-avro_2.12:3.3.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0")
         # .config("spark.jars.packages", "com.google.cloud.spark:spark-3.5-bigquery:0.41.1")
         # .config("spark.jars.packages", "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.41.1")
         # .config("spark.cassandra.connection.host", "cassandra:9042")
@@ -61,7 +64,7 @@ if __name__ == "__main__":
         .option("kafka.bootstrap.servers", "broker:29092")
         # .option("kafka.bootstrap.servers", "localhost:9092")
         .option("subscribe", "page_view_events")
-        .option("startingOffsets", "latest")
+        # .option("startingOffsets", "latest")
         .load()
     )
 
