@@ -136,7 +136,7 @@ services:
     #   dockerfile: ./spark/Dockerfile
     # image: bitnami-with-jars/spark:3.5.1-debian-12-r12
     container_name: spark-master
-    # hostname: spark-master
+    hostname: spark-master
     depends_on:
       - broker
       - eventsim
@@ -152,17 +152,17 @@ services:
       SPARK_MASTER_PORT_NUMBER: "7077"
       SPARK_MASTER_WEBUI_PORT_NUMBER: "8080"
       SPARK_MASTER_LOG_LEVEL: "INFO"
-      SPARK_MASTER_OPTS: "-Dspark.deploy.defaultCores=1 -Dspark.deploy.defaultMemory=3g"
-      SPARK_WORKER_MEMORY: "3g"
+      SPARK_MASTER_OPTS: "-Dspark.deploy.defaultCores=1 -Dspark.deploy.defaultMemory=1g"
+      SPARK_WORKER_MEMORY: "2g"
       SPARK_WORKER_CORES: "2"
-      SPARK_WORKER_INSTANCES: "2"
+      SPARK_WORKER_INSTANCES: "1"
       SPARK_WORKER_PORT: "7078"
       SPARK_WORKER_WEBUI_PORT: "8082"
       SPARK_WORKER_LOG_LEVEL: "INFO"
       SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
       GOOGLE_APPLICATION_CREDENTIALS: "/.keys/gcp-service-account.json"
-    extra_hosts:
-      - "host.docker.internal:${HOST_IP}"
+    # extra_hosts:
+    #   - "host.docker.internal:${HOST_IP}"
     volumes:
       - ./.keys/gcp-service-account.json:/.keys/gcp-service-account.json
       - ./spark/src:/opt/bitnami/spark/src
@@ -191,15 +191,15 @@ services:
     environment:
       SPARK_MODE: "worker"
       SPARK_MASTER_URL: "spark://spark-master:7077"
-      SPARK_WORKER_MEMORY: "3g"
+      SPARK_WORKER_MEMORY: "2g"
       SPARK_WORKER_CORES: "2"
       SPARK_WORKER_PORT: "7078"
       SPARK_WORKER_WEBUI_PORT: "8082"
       SPARK_WORKER_LOG_LEVEL: "INFO"
       SPARK_WORKER_OPTS: "-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=1800"
       GOOGLE_APPLICATION_CREDENTIALS: "/.keys/gcp-service-account.json"
-    extra_hosts:
-      - "host.docker.internal:${HOST_IP}"
+    # extra_hosts:
+    #   - "host.docker.internal:${HOST_IP}"
     volumes:
       - ./.keys/gcp-service-account.json:/.keys/gcp-service-account.json
       - ./spark/src:/opt/bitnami/spark/src
