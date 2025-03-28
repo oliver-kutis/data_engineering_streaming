@@ -2,7 +2,7 @@
 .venv/
 .conda/
 .vscode/
-get-pip.py
+.python-version
 requirements.txt
 __pycache__/
 
