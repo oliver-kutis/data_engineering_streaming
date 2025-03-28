@@ -1,26 +1,27 @@
+# from delta import configure_spark_with_delta_pip
+from delta import configure_spark_with_delta_pip
+from kafka_schemas.schemas import page_view_events_schema
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    window, col, date_format, unix_timestamp, from_json, approx_count_distinct
-)
-from pyspark.sql.types import (
-    StructType, StructField, IntegerType, StringType, LongType, DoubleType
-)
-# from delta import configure_spark_with_delta_pip
-from kafka_schemas.schemas import (
-    page_view_events_schema, auth_events_schema,
-    status_change_events_schema, listen_events_schema
+    col,
+    current_timestamp,
+    date_format,
+    expr,
+    from_json,
+    window,
 )
 
-from delta import *
-
-kafka_topics = ["page_view_events", "auth_events",
-                "status_change_events", "listen_events"]
+kafka_topics = [
+    "page_view_events",
+    "auth_events",
+    "status_change_events",
+    "listen_events",
+]
 
 
 def write_to_gcs(read_stream, topic):
     write_stream = (
-        read_stream.writeStream
-        .format("delta")
+        read_stream.writeStream.format("delta")
         # .partitionBy
         .outputMode("update")
         .option("checkpointLocation", "gs://eventsim/tmp/checkpoint/{topic}")
@@ -31,8 +32,7 @@ def write_to_gcs(read_stream, topic):
 
 def kafka_read_stream(topic):
     kafka = (
-        spark.readStream
-        .format("kafka")
+        spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", "broker:29092")
         .option("subscribe", topic)
         .load()
@@ -43,18 +43,26 @@ def kafka_read_stream(topic):
 
 if __name__ == "__main__":
     builder = (
-        SparkSession.builder
-        .master("spark://spark-master:7077")
+        SparkSession.builder.master("spark://spark-master:7077")
         .appName("stream_kafka_to_gcs")
         # .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.0.0")
         # .config("spark.jars", "https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.20/gcs-connector-hadoop3-2.2.20-shaded.jar")
         # .config("spark.jars", "https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.20/gcs-connector-hadoop3-2.2.20.jar")
         # .config("spark.jars", "https://repo1.maven.org/maven2/io/delta/delta-spark_2.12/3.0.0/delta-spark_2.12-3.0.0.jar")
-        .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+        .config(
+            "spark.hadoop.fs.gs.impl",
+            "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem",
+        )
         .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
-        .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", "/opt/bitnami/spark/secrets/gcp-credentials.json")
+        .config(
+            "spark.hadoop.google.cloud.auth.service.account.json.keyfile",
+            "/opt/bitnami/spark/secrets/gcp-credentials.json",
+        )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .config(
+            "spark.sql.catalog.spark_catalog",
+            "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+        )
         # .getOrCreate()
     )
     # spark = builder.getOrCreate()
@@ -68,33 +76,56 @@ if __name__ == "__main__":
     # )
 
     rs = (
-        spark.readStream
-        .format("kafka")
+        spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", "broker:29092")
         .option("subscribe", "page_view_events")
         .load()
     )
 
+    agg = (
+        rs.select(
+            from_json(col("value").cast("string"), page_view_events_schema).alias(
+                "value_json"
+            ),
+            "offset",
+        )
+        .select("value_json.*")
+        .selectExpr("timestamp_millis(ts) as ts_timestamp", "*")
+        .withWatermark("ts_timestamp", "5 minutes")
+        .filter(
+            col("ts_timestamp") >= current_timestamp() - expr("INTERVAL 35 MINUTES")
+        )
+        .groupBy(window("ts_timestamp", "1 minute"), "lon", "lat", "page", "auth")
+        # .groupBy(window("ts_timestamp", "1 minute"))  # "lon", "lat", "page", "auth")
+        .count()
+        .withColumn(
+            "ts_win_start", date_format(col("window.start"), "yyyy-MM-dd HH:mm:ss")
+        )
+        .withColumn("ts_win_end", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss"))
+        # .selectExpr("window_start as ts_win_start")
+        .select("ts_win_start", "ts_win_end", "page", "auth", "lon", "lat", "count")
+    )
+
     def write_batch(batch, batch_id):
         (
-            batch.write
-            .format("delta")
+            batch.write.format("delta")
             .mode("overwrite")
-            .save(f"gs://rt-eventsim/delta-table")
+            .save("gs://rt-eventsim/delta-table")
         )
 
     ws = (
-        rs.writeStream
-        .format("delta")
-        # .format("console")
+        # rs.writeStream
+        agg.writeStream
+        # .format("delta")
+        .format("console")
         # .foreachBatch(write_batch)
-        .trigger(processingTime="1 minute")
+        # .trigger(processingTime="1 minute")
+        .trigger(processingTime="10 seconds")
         # .partitionBy
         .outputMode("append")
-        # .option("checkpointLocation", "gs://eventsim/tmp/checkpoint/page_view_events")
-        .option("checkpointLocation", "gs://rt-eventsim/tmp/checkpoint")
-        .start(f"gs://rt-eventsim/page_view_events")
+        # .option("checkpointLocation", "gs://rt-eventsim/tmp/checkpoint")
+        # .start("gs://rt-eventsim/page_view_events")
         # .start(f"opt/bitnami/spark/test/rt-eventsim/delta-table")
-        # .start()
+        .start()
         .awaitTermination()
     )
