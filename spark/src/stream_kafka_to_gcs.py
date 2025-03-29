@@ -1,12 +1,10 @@
-# from delta import configure_spark_with_delta_pip
 from delta import configure_spark_with_delta_pip
+from delta.tables import DeltaTable
 from kafka_schemas.schemas import page_view_events_schema
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col,
-    current_timestamp,
     date_format,
-    expr,
     from_json,
     window,
 )
@@ -17,6 +15,8 @@ kafka_topics = [
     "status_change_events",
     "listen_events",
 ]
+
+pv_events_table_path = "gs://rt-eventsim/page_view_events"
 
 
 def write_to_gcs(read_stream, topic):
@@ -69,7 +69,10 @@ if __name__ == "__main__":
 
     spark = configure_spark_with_delta_pip(builder).getOrCreate()
     # context = spark.sparkContext
-
+    try:
+        pv_delta_table = DeltaTable.forPath(spark, pv_events_table_path)
+    except Exception:
+        print("Table doesn't exist yet?")
     # (
     #     context.parallelize(kafka_topics)
     #     .map(kafka_read_stream)
@@ -79,6 +82,7 @@ if __name__ == "__main__":
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", "broker:29092")
         .option("subscribe", "page_view_events")
+        .option("failOnDataLoss", "false")
         .load()
     )
 
@@ -92,9 +96,9 @@ if __name__ == "__main__":
         .select("value_json.*")
         .selectExpr("timestamp_millis(ts) as ts_timestamp", "*")
         .withWatermark("ts_timestamp", "5 minutes")
-        .filter(
-            col("ts_timestamp") >= current_timestamp() - expr("INTERVAL 35 MINUTES")
-        )
+        # .filter(
+        #     col("ts_timestamp") >= current_timestamp() - expr("INTERVAL 35 MINUTES")
+        # )
         .groupBy(window("ts_timestamp", "1 minute"), "lon", "lat", "page", "auth")
         # .groupBy(window("ts_timestamp", "1 minute"))  # "lon", "lat", "page", "auth")
         .count()
@@ -107,22 +111,33 @@ if __name__ == "__main__":
     )
 
     def write_batch(batch, batch_id):
+        # keep only partisions within the time limit
+        # min_time_treshold = current_timestamp() - expr("INTERVAL 5 MINUTES")
+        # filtered_batch = batch.filter(col("ts_win_start") >= min_time_treshold)
+        filtered_batch = batch
+        # write
         (
-            batch.write.format("delta")
-            .mode("overwrite")
-            .save("gs://rt-eventsim/delta-table")
+            filtered_batch.write.format("delta")
+            .mode("append")
+            .partitionBy("ts_win_start")
+            # .option("replaceWhere", f"ts_win_start >= '{min_time_treshold}'")
+            .save(pv_events_table_path)
         )
+
+        # (
+        #     batch.write.format("delta")
+        #     .mode("overwrite")
+        #     .save("gs://rt-eventsim/delta-table")
+        # )
 
     ws = (
         # rs.writeStream
-        agg.writeStream
-        # .format("delta")
-        .format("console")
-        # .foreachBatch(write_batch)
-        # .trigger(processingTime="1 minute")
-        .trigger(processingTime="10 seconds")
+        agg.writeStream.format("delta")
+        # .format("console")
+        .foreachBatch(write_batch)
+        .trigger(processingTime="1 minute")
         # .partitionBy
-        .outputMode("append")
+        .outputMode("update")
         # .option("checkpointLocation", "gs://rt-eventsim/tmp/checkpoint")
         # .start("gs://rt-eventsim/page_view_events")
         # .start(f"opt/bitnami/spark/test/rt-eventsim/delta-table")
