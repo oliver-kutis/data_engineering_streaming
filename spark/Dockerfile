@@ -8,8 +8,8 @@ USER root
 WORKDIR $SPARK_HOME/jars
 
 RUN apt-get update && \
-    apt-get install -y wget && \
-    apt-get clean
+  apt-get install -y wget && \
+  apt-get clean
 
 # RUN wget -U "My user agent" https://repo1.maven.org/maven2/com/google/cloud/spark/spark-bigquery-with-dependencies_2.12/0.41.1/spark-bigquery-with-dependencies_2.12-0.41.1.jar
 # RUN wget -U "My user agent" https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.20/gcs-connector-hadoop3-2.2.20-shaded.jar
@@ -33,7 +33,7 @@ COPY ./spark/src $SPARK_HOME/src
 WORKDIR $SPARK_HOME
 
 # Install deps
-RUN pip install delta-spark==3.0.0
+RUN pip install delta-spark==3.0.0 streamlit confluent-kafka
 
 # Switch bask to non-root user so nss_wrapper and nss_passwd work correctly
 USER 1001
