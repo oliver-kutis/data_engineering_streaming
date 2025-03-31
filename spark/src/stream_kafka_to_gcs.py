@@ -4,9 +4,7 @@ from kafka_schemas.schemas import page_view_events_schema
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col,
-    date_format,
     from_json,
-    window,
 )
 
 kafka_topics = [
@@ -86,29 +84,38 @@ if __name__ == "__main__":
         .load()
     )
 
-    agg = (
-        rs.select(
-            from_json(col("value").cast("string"), page_view_events_schema).alias(
-                "value_json"
-            ),
-            "offset",
-        )
-        .select("value_json.*")
-        .selectExpr("timestamp_millis(ts) as ts_timestamp", "*")
-        .withWatermark("ts_timestamp", "5 minutes")
-        # .filter(
-        #     col("ts_timestamp") >= current_timestamp() - expr("INTERVAL 35 MINUTES")
-        # )
-        .groupBy(window("ts_timestamp", "1 minute"), "lon", "lat", "page", "auth")
-        # .groupBy(window("ts_timestamp", "1 minute"))  # "lon", "lat", "page", "auth")
-        .count()
-        .withColumn(
-            "ts_win_start", date_format(col("window.start"), "yyyy-MM-dd HH:mm:ss")
-        )
-        .withColumn("ts_win_end", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss"))
-        # .selectExpr("window_start as ts_win_start")
-        .select("ts_win_start", "ts_win_end", "page", "auth", "lon", "lat", "count")
+    value_to_json = rs.select(
+        from_json(col("value").cast("string"), page_view_events_schema).alias(
+            "value_json"
+        ),
+        "offset",
     )
+
+    unpacked = value_to_json.select("value_json.*")
+
+    # agg = (
+    #     rs.select(
+    #         from_json(col("value").cast("string"), page_view_events_schema).alias(
+    #             "value_json"
+    #         ),
+    #         "offset",
+    #     )
+    #     .select("value_json.*")
+    #     .selectExpr("timestamp_millis(ts) as ts_timestamp", "*")
+    #     .withWatermark("ts_timestamp", "5 minutes")
+    #     # .filter(
+    #     #     col("ts_timestamp") >= current_timestamp() - expr("INTERVAL 35 MINUTES")
+    #     # )
+    #     .groupBy(window("ts_timestamp", "1 minute"), "lon", "lat", "page", "auth")
+    #     # .groupBy(window("ts_timestamp", "1 minute"))  # "lon", "lat", "page", "auth")
+    #     .count()
+    #     .withColumn(
+    #         "ts_win_start", date_format(col("window.start"), "yyyy-MM-dd HH:mm:ss")
+    #     )
+    #     .withColumn("ts_win_end", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss"))
+    #     # .selectExpr("window_start as ts_win_start")
+    #     .select("ts_win_start", "ts_win_end", "page", "auth", "lon", "lat", "count")
+    # )
 
     def write_batch(batch, batch_id):
         # keep only partisions within the time limit
@@ -132,7 +139,8 @@ if __name__ == "__main__":
 
     ws = (
         # rs.writeStream
-        agg.writeStream.format("delta")
+        unpacked.writeStream.format("delta")
+        # agg.writeStream.format("delta")
         # .format("console")
         .foreachBatch(write_batch)
         .trigger(processingTime="1 minute")
