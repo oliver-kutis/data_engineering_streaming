@@ -145,6 +145,7 @@ services:
     ports:
       - "8080:8080"
       - "7077:7077"
+      - "8501:8501"
       # - "10000:10000"
     environment:
       SPARK_MODE: "master"
@@ -170,6 +171,7 @@ services:
       - ./spark/apps:/opt/bitnami/spark/apps
       - ./spark/events:/opt/bitnami/spark/events
       - ./spark/conf:/opt/bitnami/spark/conf
+      - ./spark/streamlit:/opt/bitnami/spark/streamlit
 
   spark-worker:
     # image: bitnami/spark:3.5.1
@@ -207,5 +209,6 @@ services:
       - ./spark/apps:/opt/bitnami/spark/apps
       - ./spark/events:/opt/bitnami/spark/events
       - ./spark/conf:/opt/bitnami/spark/conf
+      - ./spark/streamlit:/opt/bitnami/spark/streamlit
 # volumes:
 #   spark-events:
