@@ -1,7 +1,7 @@
 # import streamlit as st
 # import polars as pl
 # from delta import configure_spark_with_delta_pip
-# from delta.tables import DeltaTable
+
 from kafka_schemas.schemas import page_view_events_schema
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, date_format, from_json, struct, to_json, window
@@ -95,10 +95,9 @@ if __name__ == "__main__":
         .withColumn("ts_win_end", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss"))
         # .select("ts_win_start", "ts_win_end", "page", "auth", "lon", "lat", "count")
         .withColumn(
-            "value",
-            to_json(struct("ts_win_start", "ts_win_end", "page", "count")),
+            "value", to_json(struct("ts_win_start", "ts_win_end", "page", "count"))
         )
-        .select(col("value"))
+        .selectExpr("CAST(page AS STRING) AS key", "CAST(value AS STRING) AS value")
         # .withColumn(
         #     "value",
         #     concat_ws(
@@ -115,11 +114,10 @@ if __name__ == "__main__":
     # Write Aggregated Data Back to Kafka
     query = (
         agg.writeStream.trigger(processingTime="1 minute")
-        .format("console")
-        # .format("kafka")
-        # .option("kafka.bootstrap.servers", "broker:29092")
-        # .option("topic", "aggregated_topic")
-        # .option("checkpointLocation", "/tmp/kafka-checkpoints")
+        .format("kafka")
+        .option("kafka.bootstrap.servers", "broker:29092")
+        .option("topic", "rt_views_by_page")
+        .option("checkpointLocation", "/tmp/kafka-checkpoints")
         .outputMode("update")
         .start()
     )
