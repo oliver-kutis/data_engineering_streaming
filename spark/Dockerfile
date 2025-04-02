@@ -34,6 +34,8 @@ WORKDIR $SPARK_HOME
 
 # Install deps
 RUN pip install delta-spark==3.0.0 streamlit confluent-kafka
+# Add bin to path
+ENV PATH="/.local/bin:${PATH}"
 
 # Switch bask to non-root user so nss_wrapper and nss_passwd work correctly
 USER 1001
