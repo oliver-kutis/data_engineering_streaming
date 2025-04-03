@@ -145,7 +145,7 @@ services:
     ports:
       - "8080:8080"
       - "7077:7077"
-      - "8501:8501"
+      # - "8501:8501"
       # - "10000:10000"
     environment:
       SPARK_MODE: "master"
@@ -171,7 +171,7 @@ services:
       - ./spark/apps:/opt/bitnami/spark/apps
       - ./spark/events:/opt/bitnami/spark/events
       - ./spark/conf:/opt/bitnami/spark/conf
-      - ./spark/streamlit:/opt/bitnami/spark/streamlit
+      - ./streamlit:/opt/bitnami/streamlit
 
   spark-worker:
     # image: bitnami/spark:3.5.1
@@ -209,6 +209,28 @@ services:
       - ./spark/apps:/opt/bitnami/spark/apps
       - ./spark/events:/opt/bitnami/spark/events
       - ./spark/conf:/opt/bitnami/spark/conf
-      - ./spark/streamlit:/opt/bitnami/spark/streamlit
+      - ./streamlit:/opt/bitnami/streamlit
+
+  streamlit:
+    image: streamlit/custom-3.9
+    build:
+      context: .
+      dockerfile: streamlit/Dockerfile
+    container_name: streamlit
+    hostname: streamlit
+    depends_on:
+      - broker
+      - spark-master
+    ports:
+      - "8501:8501"
+    environment:
+      - KAFKA_BROKER=broker:29092
+      - KAFKA_TOPIC=rt_views_by_page
+    volumes:
+      - ./streamlit:/app/streamlit
+      - ./.streamlit:/app/.streamlit
+      - ./spark/src:/app/spark/src
+      - ./spark/eventsim_kafka_schemas.py:/app/spark/eventsim_kafka_schemas.py
+    # restart: unless-stopped
 # volumes:
 #   spark-events:
