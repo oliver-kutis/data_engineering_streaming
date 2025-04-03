@@ -1,0 +1,16 @@
+[server]
+# Enable automatic reloading when files change
+runOnSave = true
+
+# Set port for the server (optional)
+port = 8501
+
+# Set address to listen on (optional)
+address = "0.0.0.0"
+
+[browser]
+# Automatically open browser when the app starts
+serverAddress = "localhost"
+serverPort = 8501
+gatherUsageStats = false
+
