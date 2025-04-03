@@ -20,6 +20,7 @@ spark/conf/*
 spark/events
 spark/data
 spark/apps
+streamlit/data
 
 # Cassandra
 cassandra/
