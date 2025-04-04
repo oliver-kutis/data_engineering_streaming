@@ -2,9 +2,18 @@
 # import polars as pl
 # from delta import configure_spark_with_delta_pip
 
+# from confluent_kafka.admin import AdminClient, NewTopic
 from kafka_schemas.schemas import page_view_events_schema
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, date_format, from_json, struct, to_json, window
+from utils import create_topic
+
+DATA_RETENTION_MINUTES = 5
+DATA_RETENTION_MS = DATA_RETENTION_MINUTES * 60 * 1000
+KAFKA_CONFIG = {
+    "bootstrap.servers": "broker:29092",
+    "group.id": "spark-consumer",
+}
 
 kafka_topics = [
     "page_view_events",
@@ -16,29 +25,32 @@ kafka_topics = [
 pv_events_table_path = "gs://rt-eventsim/page_view_events"
 
 
-def write_to_gcs(read_stream, topic):
-    write_stream = (
-        read_stream.writeStream.format("delta")
-        # .partitionBy
-        .outputMode("update")
-        .option("checkpointLocation", "gs://eventsim/tmp/checkpoint/{topic}")
-        .start(f"gs://rt-eventsim/{topic}")
-        .awaitTermination()
-    )
+# def write_to_gcs(read_stream, topic):
+#     write_stream = (
+#         read_stream.writeStream.format("delta")
+#         # .partitionBy
+#         .outputMode("update")
+#         .option("checkpointLocation", "gs://eventsim/tmp/checkpoint/{topic}")
+#         .start(f"gs://rt-eventsim/{topic}")
+#         .awaitTermination()
+#     )
+#
 
-
-def kafka_read_stream(topic):
-    kafka = (
-        spark.readStream.format("kafka")
-        .option("kafka.bootstrap.servers", "broker:29092")
-        .option("subscribe", topic)
-        .load()
-    )
-
-    write_to_gcs(kafka, topic)
+# def kafka_read_stream(topic):
+#     kafka = (
+#         spark.readStream.format("kafka")
+#         .option("kafka.bootstrap.servers", "broker:29092")
+#         .option("subscribe", topic)
+#         .load()
+#     )
+#
+#     write_to_gcs(kafka, topic)
 
 
 if __name__ == "__main__":
+    # Create Kafka Topics
+    create_topic("rt_views_by_page", KAFKA_CONFIG, DATA_RETENTION_MS)
+
     builder = (
         SparkSession.builder.master("spark://spark-master:7077")
         .appName("streamlit_app")
