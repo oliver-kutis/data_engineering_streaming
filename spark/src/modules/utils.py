@@ -1,11 +1,15 @@
-from typing import List
+from typing import Dict, List, Union
 
 from confluent_kafka.admin import AdminClient, NewTopic
+from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, from_json
-from pyspark.sql.types import DataFrame
+
+from .topics import KafkaTopic
 
 
-def create_topic(topic_name, config, data_retention_ms):
+def create_topic(
+    topic_name: Union[KafkaTopic, str], config: Dict, data_retention_ms: int
+):
     """
     Create a Kafka topic with the specified name and configuration.
 
@@ -19,6 +23,11 @@ def create_topic(topic_name, config, data_retention_ms):
 
     # Check if the topic already exists
     topic_metadata = admin_client.list_topics(timeout=10)
+    if isinstance(topic_name, KafkaTopic):
+        topic_name = topic_name.value
+    if isinstance(topic_name, str):
+        topic_name = topic_name
+
     if topic_name in topic_metadata.topics:
         print(f"Topic {topic_name} already exists, updating configs...")
     else:
