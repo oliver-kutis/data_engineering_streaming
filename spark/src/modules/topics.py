@@ -1,9 +1,11 @@
 from enum import Enum
 
 
-class RealTimeKafkaTopic(Enum):
-    VIEWS_BY_PAGE = "rt_views_by_page"
-    LISTENS_BY_ARTIST = "rt_listens_by_artist"
+class RealTimeStreamType(Enum):
+    VIEWS_BY_PAGE = "views_by_page"
+    VIEWS_IN_TIME = "views_in_time"
+    LISTENS_BY_ARTIST = "listens_by_artist"
+    LISTENS_IN_TIME = "listens_in_time"
 
 
 class KafkaTopic(Enum):

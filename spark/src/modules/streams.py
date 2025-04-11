@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Dict, Optional
 
 from pyspark.sql import DataFrame, SparkSession
@@ -20,9 +19,11 @@ from .topics import (
 from .utils import convert_from_kafka
 
 
-class RealTimeStreamType(Enum):
-    VIEWS_BY_PAGE = "views_by_page"
-    LISTENS_BY_ARTIST = "listens_by_artist"
+# class RealTimeKafkaTopic(Enum):
+#     VIEWS_BY_PAGE = "views_by_page"
+#     VIEWS_IN_TIME = "views_in_time"
+#     LISTENS_BY_ARTIST = "listens_by_artist"
+#     LISTENS_IN_TIME = "listens_in_time"
 
 
 class RealTimeStreamTransformer:
@@ -31,7 +32,7 @@ class RealTimeStreamTransformer:
 
     Attributes:
         df (DataFrame): The input streaming DataFrame containing Kafka messages.
-        stream_type (RealTimeStreamType): The type of stream to transform.
+        stream_type (RealTimeKafkaTopic): The type of stream to transform.
         schema (List): The schema to parse the Kafka messages.
 
     Returns:
@@ -40,7 +41,7 @@ class RealTimeStreamTransformer:
 
     def __init__(
         self,
-        stream_type: RealTimeStreamType,
+        stream_type: RealTimeKafkaTopic,
         spark: Optional[SparkSession] = None,
         df: Optional[DataFrame] = None,
         schema: Optional[StructType] = None,
@@ -76,7 +77,7 @@ class RealTimeStreamTransformer:
         Transform the input DataFrame based on the specified stream type.
 
         Args:
-            stream_type (RealTimeStreamType): The type of stream to transform.
+            stream_type (RealTimeKafkaTopic): The type of stream to transform.
             schema (List): The schema to parse the Kafka messages.
 
         Returns:
@@ -88,9 +89,9 @@ class RealTimeStreamTransformer:
         base_agg = unpacked.selectExpr(
             "timestamp_millis(ts) as ts_timestamp", "*"
         ).withWatermark("ts_timestamp", "5 minutes")
-        if self.stream_type == RealTimeStreamType.VIEWS_BY_PAGE:
+        if self.stream_type == RealTimeKafkaTopic.VIEWS_BY_PAGE:
             return self.views_by_page(df=base_agg, schema=self.schema)
-        elif self.stream_type == RealTimeStreamType.LISTENS_BY_ARTIST:
+        elif self.stream_type == RealTimeKafkaTopic.LISTENS_BY_ARTIST:
             return self.listens_by_artist(df=base_agg, schema=self.schema)
 
     def get_read_stream(
@@ -128,17 +129,38 @@ class RealTimeStreamTransformer:
 
     def views_by_page(self, df: DataFrame, schema: StructType) -> DataFrame:
         self.agg = (
-            df
-            # df.selectExpr("timestamp_millis(ts) as ts_timestamp", "*")
-            # .withWatermark("ts_timestamp", "5 minutes")
-            # .filter(
-            #     col("ts_timestamp") >= current_timestamp() - expr("INTERVAL 35 MINUTES")
-            # )
-            .groupBy(
+            df.withWatermark("ts_timestamp", "30 minutes")
+            .groupBy("page")
+            .count()
+            .withColumn("value", to_json(struct("page", "count")))
+            .selectExpr("CAST(page AS STRING) AS key", "CAST(value AS STRING) AS value")
+        )
+
+        return self.agg
+
+    def views_in_time(self, df: DataFrame, schema: StructType) -> DataFrame:
+        self.agg = (
+            df.groupBy(
                 window("ts_timestamp", "1 minute"),
-                "page",
             )
-            # .groupBy(window("ts_timestamp", "1 minute"))  # "lon", "lat", "page", "auth")
+            .count()
+            .withColumn(
+                "timestamp", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss")
+            )
+            .withColumn("value", to_json(struct("timestamp", "count")))
+            .selectExpr(
+                "CAST(timestamp AS STRING) AS key", "CAST(value AS STRING) AS value"
+            )
+        )
+
+        return self.agg
+
+    def listens_by_artist(self, df: DataFrame, schema: StructType) -> DataFrame:
+        self.agg = (
+            df.withWatermark("ts_timestamp", "30 minutes")
+            .groupBy(
+                "artist",
+            )
             .count()
             .withColumn(
                 "ts_win_start", date_format(col("window.start"), "yyyy-MM-dd HH:mm:ss")
@@ -146,44 +168,30 @@ class RealTimeStreamTransformer:
             .withColumn(
                 "ts_win_end", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss")
             )
-            # .select("ts_win_start", "ts_win_end", "page", "auth", "lon", "lat", "count")
             .withColumn(
-                "value", to_json(struct("ts_win_start", "ts_win_end", "page", "count"))
+                "value",
+                to_json(struct("ts_win_start", "ts_win_end", "artist", "count")),
             )
-            .selectExpr("CAST(page AS STRING) AS key", "CAST(value AS STRING) AS value")
-            # .withColumn(
-            #     "value",
-            #     concat_ws(
-            #         ",", col("lon"), col("lat"), col("auth"), col("page"), col("count")
-            #     ),
-            # )
-            # .selectExpr("CAST(ts_win_start as STRING) as key", "value")
-            # .selectExpr(
-            #     "CAST(window.start as STRING) as key",
-            #     concat
-            # )
+            .selectExpr(
+                "CAST(artist AS STRING) AS key", "CAST(value AS STRING) AS value"
+            )
         )
 
         return self.agg
 
-    def listens_by_artist(self, df: DataFrame, schema: StructType) -> DataFrame:
+    def listens_in_time(self, df: DataFrame, schema: StructType) -> DataFrame:
         self.agg = (
-            df
-            # df.selectExpr("timestamp_millis(ts) as ts_timestamp", "*")
-            # .withWatermark("ts_timestamp", "5 minutes")
-            .groupBy(
-                # window("ts_timestamp", "1 minute"),
-                "artist",
+            df.groupBy(
+                window("ts_timestamp", "1 minute"),
             )
             .count()
-            # .withColumn(
-            #     "ts_win_start", date_format(col("window.start"), "yyyy-MM-dd HH:mm:ss")
-            # )
-            # .withColumn("ts_win_end", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss"))
-            # .withColumn(
-            #     "value", to_json(struct("ts_win_start", "ts_win_end", "country", "count"))
-            # )
-            .withColumn("value", to_json(struct("artist", "count")))
+            .withColumn(
+                "timestamp", date_format(col("window.end"), "yyyy-MM-dd HH:mm:ss")
+            )
+            .withColumn(
+                "value",
+                to_json(struct("timestamp", "count")),
+            )
             .selectExpr(
                 "CAST(artist AS STRING) AS key", "CAST(value AS STRING) AS value"
             )
@@ -241,36 +249,36 @@ class RealTimeStreamTransformer:
         if not schema:
             return self._get_schema(self.stream_type)
 
-    def _validate_stream_type(self, stream_type: RealTimeStreamType) -> bool:
+    def _validate_stream_type(self, stream_type: RealTimeKafkaTopic) -> bool:
         """
         Validate the stream type.
 
         Args:
-            stream_type (RealTimeStreamType): The type of stream to validate.
+            stream_type (RealTimeKafkaTopic): The type of stream to validate.
 
         Returns:
             bool: True if the stream type is valid, False otherwise.
         """
-        if not isinstance(stream_type, RealTimeStreamType):
+        if not isinstance(stream_type, RealTimeKafkaTopic):
             raise ValueError(f"Invalid stream type: {stream_type}")
 
         return stream_type
 
-    def _get_schema(self, stream_type: RealTimeStreamType) -> StructType:
-        if stream_type == RealTimeStreamType.VIEWS_BY_PAGE:
+    def _get_schema(self, stream_type: RealTimeKafkaTopic) -> StructType:
+        if stream_type == RealTimeKafkaTopic.VIEWS_BY_PAGE:
             return page_view_events_schema
-        elif stream_type == RealTimeStreamType.LISTENS_BY_ARTIST:
+        elif stream_type == RealTimeKafkaTopic.LISTENS_BY_ARTIST:
             return listen_events_schema
 
-    def _get_topics(self, stream_type: RealTimeStreamType) -> Dict:
+    def _get_topics(self, stream_type: RealTimeKafkaTopic) -> Dict:
         self.topics = {
             "input": None,
             "output": None,
         }
-        if stream_type == RealTimeStreamType.VIEWS_BY_PAGE:
+        if stream_type == RealTimeKafkaTopic.VIEWS_BY_PAGE:
             self.topics["input"] = KafkaTopic.PAGE_VIEW_EVENTS.value
             self.topics["output"] = RealTimeKafkaTopic.VIEWS_BY_PAGE.value
-        elif stream_type == RealTimeStreamType.LISTENS_BY_ARTIST:
+        elif stream_type == RealTimeKafkaTopic.LISTENS_BY_ARTIST:
             self.topics["input"] = KafkaTopic.LISTEN_EVENTS.value
             self.topics["output"] = RealTimeKafkaTopic.LISTENS_BY_ARTIST.value
 

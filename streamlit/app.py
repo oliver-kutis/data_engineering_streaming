@@ -12,6 +12,8 @@ from utils.data_utils import (
 
 import streamlit as st
 
+# TODO: Needs a rewrite for multiple topics
+
 KAFKA_BROKER = "broker:29092"
 KAFKA_TOPIC = "rt_views_by_page"
 DATA_RETENTION_MINUTES = 6
